@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
+from jose import ExpiredSignatureError
 from pydantic import BaseModel, EmailStr
 from app.auth.service import (
-  hash_password,
-  verify_password,
-  create_access_token
+  createNewTokens,
+  login_user,
+  signup_tenant_admin,
 )
+from app.core.jwt import create_access_token, create_refresh_token, decode_token
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -20,56 +22,45 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
   email: EmailStr
   password: str
+  tenant_slug: str
+
+
+class RefreshRequest(BaseModel):
+  refresh_token: str
 
 
 @router.post("/signup")
 async def signup(data: SignupRequest):
-  # 🔴 TODO: check tenant uniqueness in DB
-  # 🔴 TODO: save tenant
-  # 🔴 TODO: save user with tenant_id
-
-  tenant_id = "tenant_generated_id"
-  user_id = "user_generated_id"
-
-  hashed = hash_password(data.password)
-
-  token = create_access_token(
-    user_id=user_id,
-    tenant_id=tenant_id,
-    tenant_slug=data.tenant_slug
-  )
-
-  return {
-    "access_token": token,
-    "token_type": "bearer"
-  }
+  try:
+    result = await signup_tenant_admin(data.tenant_name, data.tenant_slug, data.email, data.password)
+    return {"success": True, "tenant": result["tenant"], "user": result["user"]}
+  except Exception as e:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/login")
 async def login(data: LoginRequest):
-  # 🔴 TODO: fetch user by email
-  # 🔴 TODO: verify password
-  # 🔴 TODO: get tenant from user
+  try:
+    user = await login_user(data.email, data.password, data.tenant_slug)
+    access_token = create_access_token({"user_id": user["id"], "tenant_id": user["tenant_id"], "role": user["role"]})
+    refresh_token = create_refresh_token({"user_id": user["id"], "tenant_id": user["tenant_id"], "role": user["role"]})
+    return {"success": True, "user": user, "access_token": access_token, "refresh_token": refresh_token}
+  except Exception as e:
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-  fake_hashed_password = hash_password("password")
 
-  if not verify_password(data.password, fake_hashed_password):
+@router.post("/refresh")
+async def refresh_token(request: RefreshRequest):
+  try:
+    tokens = createNewTokens(request.refresh_token)
+    return tokens
+  except ExpiredSignatureError:
     raise HTTPException(
-      status_code=status.HTTP_401_UNAUTHORIZED,
-      detail="Invalid credentials"
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Refresh token expired"
     )
-
-  user_id = "user_id"
-  tenant_id = "tenant_id"
-  tenant_slug = "acme"
-
-  token = create_access_token(
-    user_id=user_id,
-    tenant_id=tenant_id,
-    tenant_slug=tenant_slug
-  )
-
-  return {
-    "access_token": token,
-    "token_type": "bearer"
-  }
+  except Exception as e:
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=str(e)
+    )

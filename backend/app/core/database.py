@@ -44,3 +44,12 @@ async def init_collections():
     await db.projects.create_index([("tenant_id",1)])
     await db.tasks.create_index([("tenant_id",1), ("project_id",1)])
     await db.activities.create_index([("tenant_id",1), ("user_id",1)])
+
+
+class Collections:
+    TENANTS = "tenants"
+    USERS = "users"
+    PROJECTS = "projects"
+    TASKS = "tasks"
+    ACTIVITIES = "activities"
+

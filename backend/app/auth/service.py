@@ -1,42 +1,81 @@
-from datetime import datetime, timedelta
-from jose import jwt
+from datetime import datetime
+
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
-from app.core.config import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 3
+from app.core.jwt import create_access_token, create_refresh_token, decode_token
+from app.core.password import hash_password, verify_password
+from app.enums.user import Role
+from app.providers.repository import get_tenant_repo, get_user_repo
 
 
-def hash_password(password: str) -> str:
-  return pwd_context.hash(password)
+async def signup_tenant_admin(name, slug, email, password):
+  tenantRepository = get_tenant_repo()
+  userRepository = get_user_repo()
+
+  tenant_data = {"name": name, "slug": slug, "is_active": False, "created_at": datetime.now(), "updated_at": datetime.now()}
+
+  tenant_result = await tenantRepository.insert_one(tenant_data)
+  tenant_id = str(tenant_result.inserted_id)
+
+  user_data = {"email": email, "password": hash_password(password), "tenant_id": tenant_id, "role": Role.ADMIN, "is_active": False, "created_at": datetime.now(), "updated_at": datetime.now()}
+
+  user_result = await userRepository.insert_one(user_data)
+  user_data["_id"] = str(user_result.inserted_id)
+  user_data["tenant_id"] = tenant_id
+
+  return {"tenant": tenant_data, "user": user_data}
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-  return pwd_context.verify(plain_password, hashed_password)
+async def login_user(email, password, tenant_slug):
+  tenantRepository = get_tenant_repo()
+  userRepository = get_user_repo()
+
+  tenant = await tenantRepository.find_one({"slug": tenant_slug, "is_active": True})
+  if not tenant:
+    raise ValueError("Tenant not found")
+  tenant_id = str(tenant["_id"])
+  
+  user = await userRepository.find_one({"email": email, "tenant_id": tenant_id, "is_active": True})
+
+  if not user or not verify_password(password, user["password"]):
+    raise ValueError("Invalid credentials")
+  
+  return {"id": str(user["_id"]), "email": user["email"], "role": user["role"], "tenant_id": tenant_id}
 
 
-def create_access_token(
-  *,
-  user_id: str,
-  tenant_id: str,
-  tenant_slug: str
-) -> str:
-  expire = datetime.now() + timedelta(
-    minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+async def createNewTokens(refresh_token:str):
+  # decode and validate refresh token
+  payload = decode_token(refresh_token)
+  if payload.get("type") != "refresh":
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid token type"
+    )
+
+  user_id = payload.get("user_id")
+  tenant_id = payload.get("tenant_id")
+  role = payload.get("role")
+
+  if not all([user_id, tenant_id, role]):
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Invalid token payload"
   )
 
-  payload = {
-    "sub": user_id,
+  # Create new access token
+  new_access_token = create_access_token({
+    "user_id": user_id,
     "tenant_id": tenant_id,
-    "tenant_slug": tenant_slug,
-    "exp": expire
-  }
+    "role": role
+  })
 
-  token = jwt.encode(
-    payload,
-    settings.JWT_SECRET,
-    algorithm=ALGORITHM
-  )
-  return token
+  # Create new refresh token (refresh token rotation)
+  new_refresh_token = create_refresh_token({
+    "user_id": user_id,
+    "tenant_id": tenant_id,
+    "role": role
+  })
+  
+  return {
+      "access_token": new_access_token,
+      "refresh_token": new_refresh_token
+    }
