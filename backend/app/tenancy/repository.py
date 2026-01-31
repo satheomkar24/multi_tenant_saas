@@ -1,9 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import Collections
-from app.tenancy.repoInterface import TenantRepositoryInterface
 
 
-class TenantRepository(TenantRepositoryInterface):
+class TenantRepository():
   def __init__(self, db: AsyncIOMotorDatabase):
     self.collection = db.get_collection(Collections.TENANTS)
 

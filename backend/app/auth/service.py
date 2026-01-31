@@ -38,8 +38,22 @@ async def login_user(email, password, tenant_slug):
 
   if not user or not verify_password(password, user["password"]):
     raise ValueError("Invalid credentials")
+
+  token_payload ={
+    "tenant_id": tenant_id,
+    "tenant_slug": tenant['slug'],
+    "user_id": str(user["_id"]),
+    "role": user["role"]
+  }
+
+    # Create new access token
+  new_access_token = create_access_token(token_payload)
+
+  # Create new refresh token (refresh token rotation)
+  new_refresh_token = create_refresh_token(token_payload)
   
-  return {"id": str(user["_id"]), "email": user["email"], "role": user["role"], "tenant_id": tenant_id}
+  return { "role": user["role"],   "access_token": new_access_token,
+      "refresh_token": new_refresh_token}
 
 
 async def createNewTokens(refresh_token:str):
@@ -50,30 +64,30 @@ async def createNewTokens(refresh_token:str):
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid token type"
     )
-
+  
   user_id = payload.get("user_id")
   tenant_id = payload.get("tenant_id")
+  tenant_slug = payload.get("tenant_slug")
   role = payload.get("role")
 
-  if not all([user_id, tenant_id, role]):
+  if not all([user_id, tenant_id, role,tenant_slug]):
     raise HTTPException(
       status_code=status.HTTP_401_UNAUTHORIZED,
       detail="Invalid token payload"
   )
 
-  # Create new access token
-  new_access_token = create_access_token({
+  token_payload ={
     "user_id": user_id,
     "tenant_id": tenant_id,
+    "tenant_slug": tenant_slug,
     "role": role
-  })
+  }
+
+  # Create new access token
+  new_access_token = create_access_token(token_payload)
 
   # Create new refresh token (refresh token rotation)
-  new_refresh_token = create_refresh_token({
-    "user_id": user_id,
-    "tenant_id": tenant_id,
-    "role": role
-  })
+  new_refresh_token = create_refresh_token(token_payload)
   
   return {
       "access_token": new_access_token,

@@ -31,4 +31,5 @@ def get_current_tenant() -> Tenant:
     tenant = _current_tenant.get()
     if tenant is None:
         raise RuntimeError("Tenant not set in request context")
+    assert tenant is not None
     return tenant

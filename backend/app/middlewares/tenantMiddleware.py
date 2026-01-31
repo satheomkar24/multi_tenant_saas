@@ -4,8 +4,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import HTTPException, status
 
 from app.core.jwt import decode_token
-from app.providers.repository import get_tenant_repo
+from app.providers.repository import get_tenant_repo, get_user_repo
 from app.tenancy.tenant import set_current_tenant
+from app.users.user import set_current_user
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
@@ -40,13 +41,27 @@ class TenantMiddleware(BaseHTTPMiddleware):
         tenantRepository = get_tenant_repo()
         tenant = await tenantRepository.find_one({"_id": ObjectId(tenant_id), "slug": tenant_slug, "is_active": True})
         if not tenant:
-          raise HTTPException(
-              status_code=status.HTTP_401_UNAUTHORIZED,
-              detail="Tenant not found or inactive"
-          )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Tenant not found or inactive"
+        )
 
         # SET CONTEXT
         set_current_tenant(tenant)
+
+        # set current user
+        user_repo = get_user_repo()
+        user = await user_repo.find_one({
+            "_id": ObjectId(payload["user_id"]),
+            "tenant_id": tenant.id,
+            "is_active": True,
+        })
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        set_current_user(user)
+
 
         # Continue request
         response = await call_next(request)

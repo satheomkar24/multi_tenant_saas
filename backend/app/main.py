@@ -10,7 +10,7 @@ from app.core.errors import (
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.middlewares.tenantMiddleware import TenantMiddleware
-# from app.auth.routes import router as auth_router
+from app.auth.routes import router as auth_router
 
 
 @asynccontextmanager
@@ -64,7 +64,7 @@ app.add_exception_handler(
 app.add_middleware(TenantMiddleware)
 
 
-# app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 
 @app.get("/health", tags=["Health"])
 async def health_check():
