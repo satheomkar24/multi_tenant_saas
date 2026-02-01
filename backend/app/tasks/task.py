@@ -21,13 +21,3 @@ class Task(BaseModel):
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
-
-
-
-# await db.tasks.update_one(
-#     {"_id": ObjectId(task_id)},
-#     {
-#         "$set": {"title": "New Title"},
-#         "$currentDate": {"updated_at": True}  # MongoDB sets updated_at automatically
-#     }
-# )

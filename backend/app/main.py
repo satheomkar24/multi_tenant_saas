@@ -8,9 +8,13 @@ from app.core.errors import (
     unhandled_exception_handler
 )
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, init_collections
 from app.middlewares.tenantMiddleware import TenantMiddleware
 from app.auth.routes import router as auth_router
+from app.users.routes import router as users_router
+from app.tasks.routes import router as tasks_router
+from app.projects.routes import router as projects_router
+from app.activities.routes import router as activities_router
 
 
 @asynccontextmanager
@@ -18,8 +22,9 @@ async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
     print("✅ MongoDB connected")
+    await init_collections()
     
-    # You can start background tasks, load caches, etc.
+    # Add background tasks, load caches, etc. 
     
     yield  # FastAPI runs here
     
@@ -64,7 +69,11 @@ app.add_exception_handler(
 app.add_middleware(TenantMiddleware)
 
 
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(projects_router)
+app.include_router(tasks_router)
+app.include_router(activities_router)
 
 @app.get("/health", tags=["Health"])
 async def health_check():

@@ -3,6 +3,6 @@ from app.core.database import Collections
 from app.providers.baseRepository import BaseRepository
 
 
-class ProjectRepository(BaseRepository):
+class ActivityRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, Collections.PROJECTS)
+        super().__init__(db, Collections.ACTIVITIES)

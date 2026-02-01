@@ -1,22 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import Collections
+from app.providers.baseRepository import BaseRepository
 
 
-class UserRepository:
+class UserRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db.get_collection(Collections.USERS)
-
-    async def find_all(self):
-        return await self.collection.find().to_list()
-
-    async def find_one(self, data: dict):
-        return await self.collection.find_one(data)
-
-    async def insert_one(self, data: dict):
-        return await self.collection.insert_one(data)
-
-    async def exists(self, query: dict) -> bool:
-        return await self.collection.find_one(query, {"_id": 1}) is not None
-
-    async def delete_one(self, query: dict):
-        return await self.collection.delete_one(query)
+        super().__init__(db, Collections.USERS)

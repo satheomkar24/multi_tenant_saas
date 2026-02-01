@@ -1,17 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import Collections
+from app.providers.baseRepository import BaseRepository
 
 
-class TenantRepository():
-  def __init__(self, db: AsyncIOMotorDatabase):
-    self.collection = db.get_collection(Collections.TENANTS)
-
-
-  async def find_one(self, data: dict ):
-    return await self.collection.find_one(data)
-  
-  
-  async def insert_one(self, data: dict):
-    return await self.collection.insert_one(data)
-    
-
+class TenantRepository(BaseRepository):
+    def __init__(self, db: AsyncIOMotorDatabase):
+        super().__init__(db, Collections.TENANTS)

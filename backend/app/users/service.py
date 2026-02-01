@@ -1,11 +1,11 @@
-from datetime import datetime
 from bson import ObjectId
 from fastapi import HTTPException, status
 
+from app.activities.service import create_activity
 from app.core.password import hash_password
+from app.enums.activity import ActivityAction
 from app.enums.user import Role
 from app.providers.repository import get_user_repo
-from app.users.repository import UserRepository
 from app.users.type import CreateUserRequest
 
 
@@ -23,15 +23,21 @@ async def create_user(data: CreateUserRequest, tenant_id):
         )
 
     user = {
-        "email": data.email,
+        "email": data.email.lower(),
         "password": hash_password(data.password),
         "tenant_id": tenant_id,
         "role": Role.USER,
         "is_active": False,
-        "created_at": datetime.now(),
-        "updated_at": datetime.now(),
     }
-    await userRepository.insert_one(user)
+    user_result = await userRepository.insert_one(user)
+
+    await create_activity(
+        action=ActivityAction.USER_CREATED,
+        entity="user",
+        entity_id=user_result.inserted_id,
+        message=f"User {user['email']} created",
+        meta={"role": user["role"]},
+    )
 
 
 async def delete_user_by_id(user_id: ObjectId, tenant_id):
